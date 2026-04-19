@@ -1,6 +1,7 @@
 # BuyerTwin AI
 
 BuyerTwin AI is an AI-powered decision copilot for real estate agents. It helps agents understand buyer intent, prioritize serious leads, recommend relevant listings, and generate personalized outreach that improves conversion from existing buyer pipelines.
+
 ## Overview
 
 Traditional CRM tools store buyer data, but they do not explain what a buyer actually cares about, how ready they are, or what the agent should do next.
