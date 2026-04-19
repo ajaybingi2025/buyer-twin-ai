@@ -6,7 +6,7 @@ from services.listing_service import get_all_listings
 from services.buyer_profile_service import get_buyer_by_user_id
 
 from services.inference_service import infer_decision_twin
-from services.recommendation_service import generate_recommendations
+from services.recommendation_service import generate_recommendation_bundle
 from services.outreach_service import generate_outreach
 
 from services.twin_service import generate_and_store_twin
@@ -42,20 +42,23 @@ def get_buyer_intelligence_by_buyer_id(buyer_id: str) -> dict:
         buyer,
         twin,
         listings,
-        generate_recommendations
+        generate_recommendation_bundle
     )
+
+    # recommendations is either a list (from cache) or a bundle dict (fresh)
+    rec_list = recommendations if isinstance(recommendations, list) else recommendations.get("ranked_recommendations", [])
 
     outreach = (
         generate_and_store_outreach(
             buyer,
             twin,
-            recommendations[0],
+            rec_list[0],
             generate_outreach
         )
-        if recommendations else None
+        if rec_list else None
     )
 
-    summary = build_buyer_summary(buyer, twin, recommendations)
+    summary = build_buyer_summary(buyer, twin, rec_list)
 
     return {
         "status": "success",
@@ -63,7 +66,7 @@ def get_buyer_intelligence_by_buyer_id(buyer_id: str) -> dict:
         "buyer": buyer,
         "events": buyer_events,
         "twin": twin,
-        "recommendations": recommendations,
+        "recommendations": rec_list,
         "outreach": outreach
     }
 
@@ -86,10 +89,11 @@ def build_inbox_item(buyer: dict) -> dict:
         buyer,
         twin,
         listings,
-        generate_recommendations
+        generate_recommendation_bundle
     )
 
-    top_recommendation = recommendations[0] if recommendations else None
+    rec_list = recommendations if isinstance(recommendations, list) else recommendations.get("ranked_recommendations", [])
+    top_recommendation = rec_list[0] if rec_list else None
 
     return {
         "buyer_id": buyer["id"],

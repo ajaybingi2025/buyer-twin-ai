@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def normalize_timestamp(value):
@@ -6,11 +6,20 @@ def normalize_timestamp(value):
         return None
 
     if isinstance(value, datetime):
+        # If timezone-aware, convert to UTC then strip tzinfo
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
         return value
 
     if isinstance(value, str):
         cleaned = value.replace("Z", "")
-        return datetime.fromisoformat(cleaned)
+        try:
+            dt = datetime.fromisoformat(cleaned)
+            if dt.tzinfo is not None:
+                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            return dt
+        except ValueError:
+            return None
 
     return None
 

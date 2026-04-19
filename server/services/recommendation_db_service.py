@@ -29,61 +29,44 @@ def get_recommendations_by_buyer_id(buyer_id: str):
             return results
 
 
-def delete_recommendations_by_buyer_id(buyer_id: str):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                DELETE FROM recommendations
-                WHERE buyer_id = %s;
-                """,
-                (buyer_id,),
-            )
-            conn.commit()
-
-
 def save_recommendations(recommendations: list):
     if not recommendations:
         return
 
     buyer_id = recommendations[0]["buyer_id"]
-    delete_recommendations_by_buyer_id(buyer_id)
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            for recommendation in recommendations:
+            cur.execute(
+                "DELETE FROM recommendations WHERE buyer_id = %s",
+                (buyer_id,)
+            )
+
+            for rec in recommendations:
                 cur.execute(
                     """
                     INSERT INTO recommendations (
-                        id,
-                        buyer_id,
-                        listing_id,
-                        address_label,
-                        city,
-                        price,
-                        fit_score,
-                        explanation,
-                        matching_factors,
-                        score_breakdown,
-                        rank
+                        id, buyer_id, listing_id, address_label,
+                        city, price, fit_score, explanation,
+                        matching_factors, score_breakdown, rank
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        recommendation["id"],
-                        recommendation["buyer_id"],
-                        recommendation["listing_id"],
-                        recommendation["address_label"],
-                        recommendation["city"],
-                        recommendation["price"],
-                        recommendation["fit_score"],
-                        recommendation["explanation"],
-                        Json(recommendation["matching_factors"]),
-                        Json(recommendation["score_breakdown"]),
-                        recommendation["rank"],
+                        rec["id"],
+                        rec["buyer_id"],
+                        rec["listing_id"],
+                        rec["address_label"],
+                        rec["city"],
+                        rec["price"],
+                        rec["fit_score"],
+                        rec["explanation"],
+                        Json(rec["matching_factors"]),
+                        Json(rec["score_breakdown"]),
+                        rec["rank"],
                     ),
                 )
-            conn.commit()
+        conn.commit()
 
 
 def generate_and_store_recommendations(
@@ -92,17 +75,18 @@ def generate_and_store_recommendations(
     listings: list,
     generate_recommendations_func
 ):
-    existing_recommendations = get_recommendations_by_buyer_id(buyer["id"])
+    existing = get_recommendations_by_buyer_id(buyer["id"])
     latest_event_ts = get_latest_event_timestamp(buyer["id"])
 
-    if existing_recommendations:
-        newest_created_at = existing_recommendations[0].get("created_at")
-
+    if existing:
+        newest_created_at = max(
+            r["created_at"] for r in existing if r.get("created_at")
+        )
         if not is_stale(latest_event_ts, newest_created_at):
-            return existing_recommendations
+            return existing
 
     recommendations = generate_recommendations_func(buyer, twin, listings)
-    save_recommendations(recommendations)
+    save_recommendations(recommendations["ranked_recommendations"])
     return recommendations
 
 
@@ -113,5 +97,5 @@ def refresh_and_store_recommendations(
     generate_recommendations_func
 ):
     recommendations = generate_recommendations_func(buyer, twin, listings)
-    save_recommendations(recommendations)
+    save_recommendations(recommendations["ranked_recommendations"])
     return recommendations

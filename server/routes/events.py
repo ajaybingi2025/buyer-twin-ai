@@ -1,12 +1,15 @@
+from datetime import datetime
+import uuid
+from typing import Optional, Dict, Any
+
+import psycopg2.extras
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
-import psycopg2
-import psycopg2.extras
-import uuid
-from datetime import datetime
+
+from db.connection import get_connection
 
 router = APIRouter()
+
 
 class EventCreate(BaseModel):
     user_id: Optional[str] = None
@@ -17,101 +20,132 @@ class EventCreate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     timestamp: Optional[str] = None
 
-def get_db_connection():
-    return psycopg2.connect(
-        host="127.0.0.1",
-        port=5432,
-        dbname="buyertwin",
-        user="postgres",
-        password="postgres",
-    )
 
 LISTING_EVENT_TYPES = {
     "listing_viewed",
     "listing_saved",
+    "listing_unsaved",
     "tour_requested",
 }
 
+
+def resolve_buyer_profile_id_from_user_id(user_id: str) -> Optional[str]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id
+                FROM buyers
+                WHERE user_id = %s
+                LIMIT 1;
+                """,
+                (str(user_id),),
+            )
+            row = cur.fetchone()
+            return row["id"] if row else None
+
+
+def listing_exists(listing_id: str) -> bool:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM listings
+                WHERE id = %s
+                LIMIT 1;
+                """,
+                (listing_id,),
+            )
+            return cur.fetchone() is not None
+
+
 @router.post("")
 def create_event(event: EventCreate):
-    if event.event_type not in LISTING_EVENT_TYPES:
-        return {
-            "message": "Event received but not stored (non-listing event)",
-            "stored": False,
-            "event_type": event.event_type,
-        }
+    print("EVENT PAYLOAD:", event.model_dump())
 
     if not event.user_id:
         raise HTTPException(status_code=400, detail="user_id is required")
 
-    if not event.target_id:
-        raise HTTPException(status_code=400, detail="target_id is required")
+    buyer_profile_id = resolve_buyer_profile_id_from_user_id(event.user_id)
 
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    if event.timestamp:
+        event_timestamp = datetime.fromisoformat(
+            event.timestamp.replace("Z", "+00:00")
+        ).replace(tzinfo=None)
+    else:
+        event_timestamp = datetime.utcnow()
 
-    cur.execute(
-        "SELECT id FROM buyers WHERE user_id = %s",
-        (str(event.user_id),)
-    )
-    buyer_row = cur.fetchone()
+    event_id = f"event_{uuid.uuid4().hex[:8]}"
 
-    if not buyer_row:
-        cur.close()
-        conn.close()
-        raise HTTPException(status_code=404, detail="No buyer profile linked to this user")
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO app_events (
+                    id,
+                    user_id,
+                    buyer_id,
+                    role,
+                    event_type,
+                    page,
+                    target_id,
+                    timestamp,
+                    metadata
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """,
+                (
+                    event_id,
+                    str(event.user_id),
+                    buyer_profile_id,
+                    event.role,
+                    event.event_type,
+                    event.page,
+                    event.target_id,
+                    event_timestamp,
+                    psycopg2.extras.Json(event.metadata or {}),
+                ),
+            )
 
-    buyer_id = buyer_row["id"]
+            stored_in_buyer_events = False
 
-    cur.execute(
-        "SELECT id FROM listings WHERE id = %s",
-        (event.target_id,)
-    )
-    listing_row = cur.fetchone()
+            if (
+                event.event_type in LISTING_EVENT_TYPES
+                and buyer_profile_id
+                and event.target_id
+                and listing_exists(event.target_id)
+            ):
+                cur.execute(
+                    """
+                    INSERT INTO buyer_events (
+                        id,
+                        buyer_id,
+                        listing_id,
+                        event_type,
+                        timestamp,
+                        source_channel,
+                        metadata
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s);
+                    """,
+                    (
+                        f"be_{uuid.uuid4().hex[:8]}",
+                        buyer_profile_id,
+                        event.target_id,
+                        event.event_type,
+                        event_timestamp,
+                        event.page,
+                        psycopg2.extras.Json(event.metadata or {}),
+                    ),
+                )
+                stored_in_buyer_events = True
 
-    if not listing_row:
-        cur.close()
-        conn.close()
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    event_id = str(uuid.uuid4())
-    event_timestamp = (
-        datetime.fromisoformat(event.timestamp.replace("Z", "+00:00")).replace(tzinfo=None)
-        if event.timestamp
-        else datetime.utcnow()
-    )
-
-    cur.execute(
-        """
-        INSERT INTO buyer_events (
-            id,
-            buyer_id,
-            listing_id,
-            event_type,
-            timestamp,
-            source_channel,
-            metadata
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            event_id,
-            buyer_id,
-            event.target_id,
-            event.event_type,
-            event_timestamp,
-            event.page,
-            psycopg2.extras.Json(event.metadata or {}),
-        ),
-    )
-
-    conn.commit()
-    cur.close()
-    conn.close()
+            conn.commit()
 
     return {
-        "message": "Event stored successfully",
+        "message": "Event processed successfully",
         "stored": True,
+        "stored_in_buyer_events": stored_in_buyer_events,
         "event_id": event_id,
-        "buyer_id": buyer_id,
-    }   
+    }
