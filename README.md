@@ -79,3 +79,109 @@ BuyerTwin/
 │   ├── .env
 │   └── requirements.txt
 └── README.md
+```
+
+## Use Case
+
+BuyerTwin AI is designed for real estate agents and teams who want to:
+
+- identify high-intent buyers faster
+- reduce time spent on low-quality leads
+- match buyers with better-fit listings
+- improve follow-up quality with AI-generated outreach
+
+## Core Workflow
+
+1. Agent logs in
+2. Buyer information is loaded
+3. Buyer activity is analyzed
+4. BuyerTwin is generated
+5. Listings are ranked by fit
+6. Outreach is generated
+7. Agent receives a next-best-action recommendation
+
+## Business Value
+
+BuyerTwin AI increases the value of existing leads without requiring agents to purchase more lead volume.
+
+### Customer pain
+
+- Time wasted on low-intent leads
+- Generic follow-up reduces response
+- High-intent buyers get missed in busy pipelines
+
+### Value created
+
+- Better lead prioritization
+- Faster, more relevant outreach
+- Higher tour-booking potential
+
+## Getting Started
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Narahari917/BuyerTwin.git
+cd BuyerTwin
+```
+
+### 2. Frontend setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 3. Backend setup
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Run the backend server using your FastAPI entry point.
+
+Example:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+> Update the command above if your FastAPI app entry file is different.
+
+## Environment Variables
+
+Create a `.env` file in the backend directory and configure the required values.
+
+Example:
+
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/buyertwin
+GROQ_API_KEY=your_groq_api_key
+```
+
+## Future Improvements
+
+- deeper CRM integration
+- real-time event ingestion
+- stronger recommendation explainability
+- buyer readiness tracking over time
+- brokerage and team analytics
+- tighter workflow integration with real estate platforms
+
+## Team
+
+- Narahari Kommi
+- Ajay Bingi
+- Anvitha Nagireddy
+
+## Elevator Pitch
+
+**BuyerTwin AI turns buyer behavior into ranked insights, better home matches, and personalized agent outreach.**
+
+## License
+
+This project was built as part of a hackathon prototype. Add your preferred license here.
