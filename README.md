@@ -1,16 +1,81 @@
-# React + Vite
+# BuyerTwin AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+BuyerTwin AI is an AI-powered decision copilot for real estate agents. It helps agents understand buyer intent, prioritize serious leads, recommend relevant listings, and generate personalized outreach that improves conversion from existing buyer pipelines.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Traditional CRM tools store buyer data, but they do not explain what a buyer actually cares about, how ready they are, or what the agent should do next.
 
-## React Compiler
+BuyerTwin AI solves that gap by combining:
+- buyer profile information
+- behavioral signals such as searches, clicks, saves, and inquiries
+- ML-based scoring and ranking
+- AI-generated summaries and outreach
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The result is a workflow that helps agents:
+- prioritize serious buyers
+- recommend the right homes faster
+- personalize communication at scale
+- improve response quality and tour conversion
 
-## Expanding the ESLint configuration
+## Key Features
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- BuyerTwin profile generation for each lead
+- Buyer scoring and prioritization
+- Listing recommendation and ranking
+- Buyer readiness estimation
+- Personalized outreach generation
+- Agent-focused workflow views
+
+## How It Works
+
+1. Buyer profile data and activity signals are collected.
+2. A BuyerTwin is created to represent buyer preferences, behavior, and intent.
+3. Buyers and listings are scored using ML-based logic.
+4. The system generates explanations and personalized outreach.
+5. Agents use the ranked insights to take the next best action.
+
+## Project Architecture
+
+### Frontend
+The frontend provides the buyer and agent experience, including dashboards, views, and recommendation screens.
+
+### Backend
+The backend handles API orchestration, structured data flow, routing, and persistence for buyer, listing, and outreach data.
+
+### AI / ML Layer
+The AI layer powers BuyerTwin modeling, ranking, recommendation logic, and personalized communication generation.
+
+## Tech Stack
+
+- React
+- Vite
+- JavaScript
+- HTML
+- CSS
+- Python
+- FastAPI
+- PostgreSQL
+- XGBoost
+- Groq API
+
+## Repository Structure
+
+```text
+BuyerTwin/
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── backend/
+│   ├── app/
+│   ├── db/
+│   ├── model/
+│   ├── models/
+│   ├── routes/
+│   ├── services/
+│   ├── .env
+│   └── requirements.txt
+└── README.md
