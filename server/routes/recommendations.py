@@ -1,10 +1,6 @@
-from fastapi import APIRouter, HTTPException, Header
-from services.inference_service import infer_decision_twin
-from services.recommendation_service import generate_recommendations
-from services.buyer_service import get_buyer_by_id
-from services.event_service import get_events_by_buyer_id
-from services.listing_service import get_all_listings
+from fastapi import APIRouter, Header, HTTPException
 from services.auth_service import get_current_user_from_header, require_role
+from services.buyer_intelligence_service import get_buyer_intelligence_by_buyer_id
 
 router = APIRouter()
 
@@ -12,15 +8,31 @@ router = APIRouter()
 @router.get("/{buyer_id}")
 def get_recommendations(buyer_id: str, authorization: str = Header(default=None)):
     current_user = get_current_user_from_header(authorization)
+
+    if current_user["role"] == "agent":
+        pass
+    elif current_user["role"] == "buyer":
+        if str(current_user["id"]) != str(buyer_id):
+            raise HTTPException(status_code=403, detail="Buyers can only view their own recommendations")
+    else:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    intelligence = get_buyer_intelligence_by_buyer_id(buyer_id)
+
+    return {
+        "status": "success",
+        "recommendations": intelligence["recommendations"]
+    }
+
+
+@router.post("/{buyer_id}/refresh")
+def refresh_recommendations(buyer_id: str, authorization: str = Header(default=None)):
+    current_user = get_current_user_from_header(authorization)
     require_role(current_user, ["agent"])
 
-    buyer = get_buyer_by_id(buyer_id)
-
-    if not buyer:
-        raise HTTPException(status_code=404, detail="Buyer not found")
-
-    buyer_events = get_events_by_buyer_id(buyer_id)
-    twin = infer_decision_twin(buyer, buyer_events)
-    listings = get_all_listings()
-
-    return generate_recommendations(buyer, twin, listings)
+    intelligence = get_buyer_intelligence_by_buyer_id(buyer_id)
+    return {
+        "status": "success",
+        "message": "Recommendations refreshed or retrieved",
+        "recommendations": intelligence["recommendations"]
+    }

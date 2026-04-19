@@ -1,11 +1,6 @@
-from fastapi import APIRouter, HTTPException, Header
-from services.inference_service import infer_decision_twin
-from services.recommendation_service import generate_recommendations
-from services.outreach_service import generate_outreach
-from services.buyer_service import get_buyer_by_id
-from services.event_service import get_events_by_buyer_id
-from services.listing_service import get_all_listings
+from fastapi import APIRouter, Header
 from services.auth_service import get_current_user_from_header, require_role
+from services.buyer_intelligence_service import get_buyer_intelligence_by_buyer_id
 
 router = APIRouter()
 
@@ -15,18 +10,18 @@ def create_outreach(buyer_id: str, authorization: str = Header(default=None)):
     current_user = get_current_user_from_header(authorization)
     require_role(current_user, ["agent"])
 
-    buyer = get_buyer_by_id(buyer_id)
+    intelligence = get_buyer_intelligence_by_buyer_id(buyer_id)
+    return intelligence["outreach"]
 
-    if not buyer:
-        raise HTTPException(status_code=404, detail="Buyer not found")
 
-    buyer_events = get_events_by_buyer_id(buyer_id)
-    twin = infer_decision_twin(buyer, buyer_events)
-    listings = get_all_listings()
-    recommendations = generate_recommendations(buyer, twin, listings)
+@router.post("/{buyer_id}/refresh")
+def refresh_outreach(buyer_id: str, authorization: str = Header(default=None)):
+    current_user = get_current_user_from_header(authorization)
+    require_role(current_user, ["agent"])
 
-    if not recommendations:
-        raise HTTPException(status_code=404, detail="No recommendations available")
-
-    top_recommendation = recommendations[0]
-    return generate_outreach(buyer, twin, top_recommendation)
+    intelligence = get_buyer_intelligence_by_buyer_id(buyer_id)
+    return {
+        "status": "success",
+        "message": "Outreach refreshed or retrieved",
+        "outreach": intelligence["outreach"]
+    }

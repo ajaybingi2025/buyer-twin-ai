@@ -67,6 +67,51 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
             return dict(row) if row else None
 
 
+def get_buyer_profile_by_user_id(user_id: int) -> Optional[dict]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, name, email, phone, budget_min, budget_max,
+                       desired_locations, timeline, must_have_features,
+                       inquiry_text, created_at, user_id
+                FROM buyers
+                WHERE user_id = %s;
+                """,
+                (str(user_id),),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def generate_next_buyer_id(cur) -> str:
+    cur.execute(
+        """
+        SELECT id
+        FROM buyers
+        WHERE id LIKE 'buyer_%'
+        ORDER BY id DESC
+        LIMIT 1;
+        """
+    )
+    row = cur.fetchone()
+
+    if not row:
+        return "buyer_001"
+
+    row = dict(row)
+    last_id = row["id"]
+    last_num = int(last_id.split("_")[1])
+    return f"buyer_{last_num + 1:03d}"
+
+
+def attach_buyer_profile_id(user: dict) -> dict:
+    user = dict(user)
+    buyer_profile = get_buyer_profile_by_user_id(int(user["id"]))
+    user["buyer_profile_id"] = buyer_profile["id"] if buyer_profile else None
+    return user
+
+
 def create_user(name: str, email: str, password: str, role: str) -> dict:
     existing_user = get_user_by_email(email)
     if existing_user:
@@ -84,9 +129,73 @@ def create_user(name: str, email: str, password: str, role: str) -> dict:
                 """,
                 (name, email, password_hash, role),
             )
-            created_user = cur.fetchone()
+            created_user = dict(cur.fetchone())
+
+            if role == "buyer":
+                cur.execute(
+                    """
+                    SELECT id
+                    FROM buyers
+                    WHERE email = %s
+                    LIMIT 1;
+                    """,
+                    (email,),
+                )
+                existing_buyer = cur.fetchone()
+
+                if existing_buyer:
+                    existing_buyer = dict(existing_buyer)
+                    cur.execute(
+                        """
+                        UPDATE buyers
+                        SET user_id = %s
+                        WHERE id = %s;
+                        """,
+                        (str(created_user["id"]), existing_buyer["id"]),
+                    )
+                    buyer_profile_id = existing_buyer["id"]
+                else:
+                    buyer_profile_id = generate_next_buyer_id(cur)
+
+                    cur.execute(
+                        """
+                        INSERT INTO buyers (
+                            id,
+                            name,
+                            email,
+                            phone,
+                            budget_min,
+                            budget_max,
+                            desired_locations,
+                            timeline,
+                            must_have_features,
+                            inquiry_text,
+                            created_at,
+                            user_id
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s);
+                        """,
+                        (
+                            buyer_profile_id,
+                            name,
+                            email,
+                            "",
+                            0,
+                            0,
+                            "[]",
+                            "",
+                            "[]",
+                            "",
+                            str(created_user["id"]),
+                        ),
+                    )
+
+                created_user["buyer_profile_id"] = buyer_profile_id
+            else:
+                created_user["buyer_profile_id"] = None
+
             conn.commit()
-            return dict(created_user)
+            return created_user
 
 
 def authenticate_user(email: str, password: str) -> Optional[dict]:
@@ -97,13 +206,15 @@ def authenticate_user(email: str, password: str) -> Optional[dict]:
     if not verify_password(password, user["password_hash"]):
         return None
 
-    return {
+    authenticated_user = {
         "id": user["id"],
         "name": user["name"],
         "email": user["email"],
         "role": user["role"],
         "created_at": user["created_at"],
     }
+
+    return attach_buyer_profile_id(authenticated_user)
 
 
 def decode_access_token(token: str) -> Optional[dict]:
@@ -132,7 +243,7 @@ def get_current_user_from_header(authorization: str = Header(default=None)) -> d
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return user
+    return attach_buyer_profile_id(user)
 
 
 def require_role(user: dict, allowed_roles: list[str]) -> None:
